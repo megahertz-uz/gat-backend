@@ -1,13 +1,8 @@
 from sqlmodel import Field, SQLModel, Relationship
-from pydantic import EmailStr
-from pydantic import condecimal
+from pydantic import EmailStr, condecimal
 from datetime import datetime, timedelta
-
-
-class City(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(max_length=100)
-    description: str | None = Field(default=None, max_length=255)
+from typing import List, Optional
+from enum import Enum
 
 
 class Plan(SQLModel, table=True):
@@ -35,7 +30,7 @@ class Subscription(SQLModel, table=True):
     def renew_subscription(self):
         if self.auto_renew:
             self.start_date = datetime.utcnow()
-            self.end_date = self.start_date + timedelta(days=self.plan.duration_months * 30)  # пример для месяцев
+            self.end_date = self.start_date + timedelta(days=self.plan.duration_months * 30)
 
     class ConfigDict:
         arbitrary_types_allowed = True
@@ -49,8 +44,98 @@ class Payment(SQLModel, table=True):
     payment_date: datetime = Field(default_factory=datetime.utcnow)
     status: str = Field(default="pending", max_length=20)  # статусы: "pending", "completed", "failed"
 
-    user: 'User' = Relationship()
+    user: 'User' = Relationship(back_populates="payments")
     subscription: 'Subscription' = Relationship()
+
+
+class QuestStatusEnum(str, Enum):
+    in_progress = "in_progress"
+    completed = "completed"
+    failed = "failed"
+
+
+class MissionStatusEnum(str, Enum):
+    in_progress = "in_progress"
+    completed = "completed"
+    failed = "failed"
+
+
+class City(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class Artifact(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class ArtifactPiece(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    artifact_id: int = Field(foreign_key="artifact.id")
+    name: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=500)
+
+    artifact: Artifact = Relationship()
+
+
+class Quest(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class Mission(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    quest_id: int = Field(foreign_key="quest.id")
+    name: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=500)
+    mission_order: int = Field()
+    reward_artifact_piece_id: int | None = Field(foreign_key="artifactpiece.id")
+    city_id: int | None = Field(foreign_key="city.id")
+
+    quest: Quest = Relationship()
+    city: Optional[City] = Relationship()
+    reward_artifact_piece: Optional[ArtifactPiece] = Relationship()
+
+
+class Achievement(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class UserAchievement(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    achievement_id: int = Field(foreign_key="achievement.id")
+    progress: int = Field(default=0)
+    unit_of_measurement: str | None = Field(max_length=50)
+
+    user: 'User' = Relationship(back_populates="achievements")
+    achievement: 'Achievement' = Relationship()
+
+
+class UserQuest(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    quest_id: int = Field(foreign_key="quest.id")
+    status: QuestStatusEnum = Field(default=QuestStatusEnum.in_progress)
+
+    user: 'User' = Relationship(back_populates="quests")
+    quest: 'Quest' = Relationship()
+
+
+class UserMission(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    mission_id: int = Field(foreign_key="mission.id")
+    status: MissionStatusEnum = Field(default=MissionStatusEnum.in_progress)
+
+    user: 'User' = Relationship(back_populates="missions")
+    mission: 'Mission' = Relationship()
 
 
 class UserBase(SQLModel):
@@ -68,8 +153,11 @@ class User(UserBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime | None = Field(default=None)
 
-    subscriptions: list["Subscription"] = Relationship(back_populates="user")
-    payments: list["Payment"] = Relationship(back_populates="user")
+    subscriptions: List['Subscription'] = Relationship(back_populates="user")
+    payments: List['Payment'] = Relationship(back_populates="user")
+    quests: List['UserQuest'] = Relationship(back_populates="user")
+    missions: List['UserMission'] = Relationship(back_populates="user")
+    achievements: List['UserAchievement'] = Relationship(back_populates="user")
 
     def update_timestamp(self):
         self.updated_at = datetime.utcnow()
@@ -96,7 +184,7 @@ class UserPublic(UserBase):
 
 
 class UsersPublic(SQLModel):
-    data: list[UserPublic]
+    data: List[UserPublic]
     count: int
 
 
@@ -110,12 +198,65 @@ class UserRegister(SQLModel):
         arbitrary_types_allowed = True
 
 
+class Story(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    title: str = Field(max_length=255)
+    description: str | None = Field(default=None, max_length=500)
+    picture_small_url: str = Field(max_length=255)  # Превью изображение (маленькое)
+    picture_big_url: str = Field(max_length=255)  # Полное изображение (большое)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class ConfigDict:
+        json_encoders = {
+            datetime: lambda v: v.isoformat(),
+        }
+
+
+class StoryPublic(SQLModel):
+    id: int
+    title: str
+    description: str | None
+    picture_small_url: str
+    picture_big_url: str
+    created_at: datetime
+
+
+class StoriesPublic(SQLModel):
+    data: list[StoryPublic]
+    count: int
+
+
+class PlaceBase(SQLModel):
+    title: str
+    latitude: float
+    longitude: float
+
+
+class Place(PlaceBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    description: str | None = Field(default=None, max_length=500)
+    picture_small_url: str = Field(max_length=255)
+    picture_big_url: str = Field(max_length=255)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class ConfigDict:
+        arbitrary_types_allowed = True
+
+
+class PlacePublic(PlaceBase):
+    picture_small_url: str
+
+
+class PlaceDetailPublic(PlaceBase):
+    picture_big_url: str
+    description: str | None
+
+
 class Token(SQLModel):
     access_token: str
     token_type: str = "bearer"
 
 
-# Contents of JWT token
 class TokenPayload(SQLModel):
     sub: int | None = None
 

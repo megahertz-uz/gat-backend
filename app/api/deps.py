@@ -42,7 +42,7 @@ async def get_lesson_content_redis() -> RedisClient:
 
 
 TokenBlacklistRedisDep = Annotated[RedisClient, Depends(get_token_blacklist_redis)]
-LessonContentRedisDep = Annotated[RedisClient, Depends(get_lesson_content_redis)]
+ContentRedisDep = Annotated[RedisClient, Depends(get_lesson_content_redis)]
 
 
 async def get_current_user(session: SessionDep, token: TokenDep, redis: TokenBlacklistRedisDep) -> User:
