@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
-from app.models import Place, PlacePublic, PlaceDetailPublic
 from typing import List
+
+from app.core.minio_handler import minio_client
+from app.models import Place, PlacePublic, PlaceDetailPublic
 from app.api.deps import (
     get_current_user,
     SessionDep,
@@ -19,7 +21,7 @@ def get_places(session: SessionDep):
         PlacePublic(
             id=place.id,
             title=place.title,
-            picture_small_url=place.picture_small_url,
+            picture_small_url=minio_client.get_object_url("places-bucket", place.picture_small_url),
             latitude=place.latitude,
             longitude=place.longitude
         )
@@ -36,7 +38,7 @@ def get_place_detail(place_id: int, session: SessionDep):
     return PlaceDetailPublic(
         id=place.id,
         title=place.title,
-        picture_big_url=place.picture_big_url,
+        picture_big_url=minio_client.get_object_url("places-bucket", place.picture_big_url),
         description=place.description,
         latitude=place.latitude,
         longitude=place.longitude

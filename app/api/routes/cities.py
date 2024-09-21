@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
+
+from app.core.minio_handler import minio_client
 from app.models import CityWithProgress
 from app import crud
 from app.api.deps import (
@@ -28,7 +30,7 @@ def get_cities_with_progress(session: SessionDep, current_user: CurrentUser):
                 id=city.id,
                 name=city.name,
                 description=city.description,
-                picture_small_url=city.picture_small_url,
+                picture_small_url=minio_client.get_object_url("cities-bucket", city.picture_small_url),
                 latitude=city.latitude,
                 longitude=city.longitude,
                 progress=progress
@@ -51,7 +53,7 @@ def get_city(session: SessionDep, city_id: int):
             "id": city.id,
             "name": city.name,
             "description": city.description,
-            "picture_small_url": city.picture_small_url,
+            "picture_small_url": minio_client.get_object_url("cities-bucket", city.picture_small_url),
             "latitude": city.latitude,
             "longitude": city.longitude,
         },
@@ -60,7 +62,7 @@ def get_city(session: SessionDep, city_id: int):
                 "id": quest.id,
                 "title": quest.title,
                 "description": quest.description,
-                "picture_small_url": quest.picture_small_url
+                "picture_small_url": minio_client.get_object_url("quests-bucket", quest.picture_small_url)
             }
             for quest in quests
         ]

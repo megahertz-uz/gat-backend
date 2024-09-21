@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from sqlmodel import select
+
+from app.core.minio_handler import minio_client
 from app.models import QuestPublic, CityPublic, Quest, Mission, Dialogue
 from app import crud
 from app.api.deps import (
@@ -21,7 +23,7 @@ def get_quests(session: SessionDep):
             id=quest.id,
             title=quest.name,
             description=quest.description,
-            picture_small_url=quest.picture_small_url,
+            picture_small_url=minio_client.get_object_url("quests-bucket", quest.picture_small_url),
             city=CityPublic(
                 id=city.id,
                 title=city.title,
@@ -52,8 +54,12 @@ def get_quest(quest_id: int, session: SessionDep, current_user: CurrentUser):
             "mission_id": mission.id,
             "name": mission.name,
             "description": mission.description,
-            "dialogues": [{"character_name": d.character_name, "text": d.text, "background_url": d.background_url,
-                           "character_image_url": d.character_image_url} for d in dialogues]
+            "dialogues": [{
+                "character_name": d.character_name,
+                "text": d.text,
+                "background_url": minio_client.get_object_url("backgrounds-bucket", d.background_url),
+                "character_image_url": minio_client.get_object_url("characters-bucket", d.character_image_url)
+            } for d in dialogues]
         })
 
     return {
