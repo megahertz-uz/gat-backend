@@ -42,9 +42,6 @@ jobs:
           username: ${{ steps.import-secrets.outputs.REGISTRY_USERNAME }}
           password: ${{ steps.import-secrets.outputs.REGISTRY_PASSWORD }}
 
-      - name: Docker pull
-        run: docker pull ${{ steps.import-secrets.outputs.REGISTRY_URL }}/${{ env.IMAGE_PREFIX }}:latest
-
       - name: Checkout
         uses: actions/checkout@v4
 
