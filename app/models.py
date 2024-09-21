@@ -1,7 +1,6 @@
 from sqlmodel import Field, SQLModel, Relationship
 from pydantic import EmailStr, condecimal
 from datetime import datetime, timedelta
-from typing import List, Optional
 from enum import Enum
 
 
@@ -48,6 +47,18 @@ class Payment(SQLModel, table=True):
     subscription: 'Subscription' = Relationship()
 
 
+class Dialogue(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    mission_id: int = Field(foreign_key="mission.id")
+    character_name: str = Field(max_length=255)
+    text: str = Field(max_length=500)
+    background_url: str = Field(max_length=255)
+    character_image_url: str = Field(max_length=255)
+    order: int = Field(default=0)  # Порядок вызова диалогов
+
+    mission: 'Mission' = Relationship(back_populates="dialogues")
+
+
 class QuestStatusEnum(str, Enum):
     in_progress = "in_progress"
     completed = "completed"
@@ -60,10 +71,37 @@ class MissionStatusEnum(str, Enum):
     failed = "failed"
 
 
-class City(SQLModel, table=True):
+class CityBase(SQLModel):
+    title: str
+    latitude: float
+    longitude: float
+    picture_small_url: str = Field(max_length=255)
+
+
+class City(CityBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(max_length=255)
     description: str | None = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    quests: list["Quest"] = Relationship(back_populates="city")
+
+
+class CityWithProgress(SQLModel):
+    id: int
+    name: str
+    description: str | None
+    picture_small_url: str
+    latitude: float
+    longitude: float
+    progress: float
+
+
+class CityPublic(SQLModel):
+    id: int
+    title: str
+    picture_small_url: str
+    latitude: float
+    longitude: float
 
 
 class Artifact(SQLModel, table=True):
@@ -83,8 +121,20 @@ class ArtifactPiece(SQLModel, table=True):
 
 class Quest(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(max_length=255)
+    title: str = Field(max_length=255)
     description: str | None = Field(default=None, max_length=500)
+    city_id: int = Field(foreign_key="city.id")
+    city: City | None = Relationship(back_populates="quests")
+    missions: list["Mission"] = Relationship(back_populates="quest")
+
+
+
+class QuestPublic(SQLModel):
+    id: int
+    title: str
+    description: str | None
+    picture_small_url: str
+    city: str
 
 
 class Mission(SQLModel, table=True):
@@ -92,13 +142,14 @@ class Mission(SQLModel, table=True):
     quest_id: int = Field(foreign_key="quest.id")
     name: str = Field(max_length=255)
     description: str | None = Field(default=None, max_length=500)
-    mission_order: int = Field()
+    mission_order: int = Field()  # Порядок вызова миссий в квесте
     reward_artifact_piece_id: int | None = Field(foreign_key="artifactpiece.id")
     city_id: int | None = Field(foreign_key="city.id")
 
-    quest: Quest = Relationship()
-    city: Optional[City] = Relationship()
-    reward_artifact_piece: Optional[ArtifactPiece] = Relationship()
+    quest: Quest = Relationship(back_populates="missions")
+    city: City | None = Relationship()
+    reward_artifact_piece: ArtifactPiece | None = Relationship()
+    dialogues: list["Dialogue"] = Relationship(back_populates="mission")
 
 
 class Achievement(SQLModel, table=True):
@@ -153,11 +204,11 @@ class User(UserBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime | None = Field(default=None)
 
-    subscriptions: List['Subscription'] = Relationship(back_populates="user")
-    payments: List['Payment'] = Relationship(back_populates="user")
-    quests: List['UserQuest'] = Relationship(back_populates="user")
-    missions: List['UserMission'] = Relationship(back_populates="user")
-    achievements: List['UserAchievement'] = Relationship(back_populates="user")
+    subscriptions: list['Subscription'] = Relationship(back_populates="user")
+    payments: list['Payment'] = Relationship(back_populates="user")
+    quests: list['UserQuest'] = Relationship(back_populates="user")
+    missions: list['UserMission'] = Relationship(back_populates="user")
+    achievements: list['UserAchievement'] = Relationship(back_populates="user")
 
     def update_timestamp(self):
         self.updated_at = datetime.utcnow()
@@ -184,7 +235,7 @@ class UserPublic(UserBase):
 
 
 class UsersPublic(SQLModel):
-    data: List[UserPublic]
+    data: list[UserPublic]
     count: int
 
 

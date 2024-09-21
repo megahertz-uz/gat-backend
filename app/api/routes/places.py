@@ -10,7 +10,7 @@ from app.api.deps import (
 router = APIRouter()
 
 
-@router.get("/places", dependencies=[Depends(get_current_user)], response_model=List[PlacePublic])
+@router.get("/", dependencies=[Depends(get_current_user)], response_model=List[PlacePublic])
 def get_places(session: SessionDep):
     statement = select(Place).order_by(Place.created_at.desc())
     places = session.exec(statement).all()
